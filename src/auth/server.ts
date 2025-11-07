@@ -195,19 +195,14 @@ export class AuthServer {
       prompt: 'consent'
     });
     
-    // Always show the URL in console for easy access
-    process.stderr.write(`\n🔗 Authentication URL: ${authorizeUrl}\n\n`);
-    process.stderr.write(`Or visit: http://localhost:${port}\n\n`);
+    // Auth URL printing removed - tokens will be passed as parameters
     
     if (openBrowser) {
       try {
         await open(authorizeUrl);
-        process.stderr.write(`Browser opened automatically. If it didn't open, use the URL above.\n`);
       } catch (error) {
-        process.stderr.write(`Could not open browser automatically. Please use the URL above.\n`);
+        // Silent failure - auth URL not printed
       }
-    } else {
-      process.stderr.write(`Please visit the URL above to complete authentication.\n`);
     }
 
     return true; // Auth flow initiated

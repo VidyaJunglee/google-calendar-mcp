@@ -20,6 +20,13 @@ import { GetCurrentTimeHandler } from "../handlers/core/GetCurrentTimeHandler.js
 // Note: Event datetime fields (start/end) are NOT shared to avoid $ref generation
 // Each tool defines its own inline schemas for these fields
 
+// Auth token schemas - optional for all tools
+const authTokenSchemas = {
+  access_token: z.string().optional().describe("Optional OAuth2 access token for authentication"),
+  refresh_token: z.string().optional().describe("Optional OAuth2 refresh token for authentication"),
+  expiry_date: z.number().optional().describe("Optional OAuth2 token expiry date in milliseconds since epoch")
+};
+
 const timeMinSchema = z.string()
   .refine((val) => {
     const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
@@ -62,9 +69,12 @@ const sharedExtendedPropertySchema = z
 
 // Define all tool schemas with TypeScript inference
 export const ToolSchemas = {
-  'list-calendars': z.object({}),
+  'list-calendars': z.object({
+    ...authTokenSchemas
+  }),
 
   'list-events': z.object({
+    ...authTokenSchemas,
     calendarId: z.union([
       z.string().describe(
         "Calendar identifier(s) to query. Accepts calendar IDs (e.g., 'primary', 'user@gmail.com') OR calendar names (e.g., 'Work', 'Personal'). Single calendar: 'primary'. Multiple calendars: array ['Work', 'Personal'] or JSON string '[\"Work\", \"Personal\"]'"
@@ -87,6 +97,7 @@ export const ToolSchemas = {
   }),
   
   'search-events': z.object({
+    ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     query: z.string().describe(
       "Free text search query (searches summary, description, location, attendees, etc.)"
@@ -126,6 +137,7 @@ export const ToolSchemas = {
   }),
   
   'get-event': z.object({
+    ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     eventId: z.string().describe("ID of the event to retrieve"),
     fields: z.array(z.enum(ALLOWED_EVENT_FIELDS)).optional().describe(
@@ -133,9 +145,12 @@ export const ToolSchemas = {
     )
   }),
 
-  'list-colors': z.object({}),
+  'list-colors': z.object({
+    ...authTokenSchemas
+  }),
   
   'create-event': z.object({
+    ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     eventId: z.string().optional().describe("Optional custom event ID (5-1024 characters, base32hex encoding: lowercase letters a-v and digits 0-9 only). If not provided, Google Calendar will generate one."),
     summary: z.string().describe("Title of the event"),
@@ -249,6 +264,7 @@ export const ToolSchemas = {
   }),
   
   'update-event': z.object({
+    ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     eventId: z.string().describe("ID of the event to update"),
     summary: z.string().optional().describe("Updated title of the event"),
@@ -391,6 +407,7 @@ export const ToolSchemas = {
   ),
   
   'delete-event': z.object({
+    ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     eventId: z.string().describe("ID of the event to delete"),
     sendUpdates: z.enum(["all", "externalOnly", "none"]).default("all").describe(
@@ -399,6 +416,7 @@ export const ToolSchemas = {
   }),
   
   'get-freebusy': z.object({
+    ...authTokenSchemas,
     calendars: z.array(z.object({
       id: z.string().describe("ID of the calendar (use 'primary' for the main calendar)")
     })).describe(
@@ -428,6 +446,7 @@ export const ToolSchemas = {
   }),
   
   'get-current-time': z.object({
+    ...authTokenSchemas,
     timeZone: z.string().optional().describe(
       "Optional IANA timezone (e.g., 'America/Los_Angeles', 'Europe/London', 'UTC'). If not provided, uses the primary Google Calendar's default timezone."
     )

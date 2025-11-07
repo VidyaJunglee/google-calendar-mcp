@@ -38,92 +38,47 @@ export class GoogleCalendarMcpServer {
     this.tokenManager = new TokenManager(this.oauth2Client);
     this.authServer = new AuthServer(this.oauth2Client);
 
-    // 2. Handle startup authentication based on transport type
-    await this.handleStartupAuthentication();
-
-    // 3. Set up Modern Tool Definitions
+    // 2. Set up Modern Tool Definitions
     this.registerTools();
 
-    // 4. Set up Graceful Shutdown
+    // 3. Set up Graceful Shutdown
     this.setupGracefulShutdown();
   }
 
-  private async handleStartupAuthentication(): Promise<void> {
-    // Skip authentication in test environment
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-    
-    const accountMode = this.tokenManager.getAccountMode();
-    
-    if (this.config.transport.type === 'stdio') {
-      // For stdio mode, ensure authentication before starting server
-      const hasValidTokens = await this.tokenManager.validateTokens(accountMode);
-      if (!hasValidTokens) {
-        // Ensure we're using the correct account mode (don't override it)
-        const authSuccess = await this.authServer.start(true); // openBrowser = true
-        if (!authSuccess) {
-          process.stderr.write(`Authentication failed for ${accountMode} account. Please check your OAuth credentials and try again.\n`);
-          process.exit(1);
-        }
-        process.stderr.write(`Successfully authenticated user.\n`);
-      } else {
-        process.stderr.write(`Valid ${accountMode} user tokens found, skipping authentication prompt.\n`);
-      }
-    } else {
-      // For HTTP mode, check for tokens but don't block startup
-      const hasValidTokens = await this.tokenManager.validateTokens(accountMode);
-      if (!hasValidTokens) {
-        process.stderr.write(`⚠️  No valid ${accountMode} user authentication tokens found.\n`);
-        process.stderr.write('Visit the server URL in your browser to authenticate, or run "npm run auth" separately.\n');
-      } else {
-        process.stderr.write(`Valid ${accountMode} user tokens found.\n`);
-      }
-    }
-  }
+
 
   private registerTools(): void {
     ToolRegistry.registerAll(this.server, this.executeWithHandler.bind(this));
   }
 
-  private async ensureAuthenticated(): Promise<void> {
-    // Check if we already have valid tokens
-    if (await this.tokenManager.validateTokens()) {
-      return;
-    }
-
-    // For stdio mode, authentication should have been handled at startup
-    if (this.config.transport.type === 'stdio') {
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        "Authentication tokens are no longer valid. Please restart the server to re-authenticate."
-      );
-    }
-
-    // For HTTP mode, try to start auth server if not already running
-    try {
-      const authSuccess = await this.authServer.start(false); // openBrowser = false for HTTP mode
-      
-      if (!authSuccess) {
+  private async executeWithHandler(handler: any, args: any): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+    // Extract auth tokens from request parameters if provided
+    const { access_token, refresh_token, ...toolArgs } = args;
+    
+    // Create an OAuth2Client instance with tokens from parameters
+    let authClient = this.oauth2Client;
+    
+    if (access_token || refresh_token) {
+      // Use tokens from request parameters
+      authClient = await initializeOAuth2Client();
+      authClient.setCredentials({
+        access_token: access_token,
+        refresh_token: refresh_token
+      });
+    } else {
+      // Fall back to checking stored tokens
+      if (await this.tokenManager.validateTokens()) {
+        // Use existing stored tokens
+        authClient = this.oauth2Client;
+      } else {
         throw new McpError(
           ErrorCode.InvalidRequest,
-          "Authentication required. Please run 'npm run auth' to authenticate, or visit the auth URL shown in the logs for HTTP mode."
+          "[GOOGLE_AUTH_ERROR] Authentication required. Please provide access_token and refresh_token as parameters."
         );
       }
-    } catch (error) {
-      if (error instanceof McpError) {
-        throw error;
-      }
-      if (error instanceof Error) {
-        throw new McpError(ErrorCode.InvalidRequest, error.message);
-      }
-      throw new McpError(ErrorCode.InvalidRequest, "Authentication required. Please run 'npm run auth' to authenticate.");
     }
-  }
-
-  private async executeWithHandler(handler: any, args: any): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-    await this.ensureAuthenticated();
-    const result = await handler.runTool(args, this.oauth2Client);
+    
+    const result = await handler.runTool(toolArgs, authClient);
     return result;
   }
 
