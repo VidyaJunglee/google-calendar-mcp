@@ -24,7 +24,7 @@ import { GetCurrentTimeHandler } from "../handlers/core/GetCurrentTimeHandler.js
 const authTokenSchemas = {
   access_token: z.string().optional().describe("Optional OAuth2 access token for authentication"),
   refresh_token: z.string().optional().describe("Optional OAuth2 refresh token for authentication"),
-  expiry_date: z.number().optional().describe("Optional OAuth2 token expiry date in milliseconds since epoch")
+  expiry_date: z.string().optional().describe("Optional OAuth2 token expiry date in milliseconds since epoch (as string)")
 };
 
 const timeMinSchema = z.string()

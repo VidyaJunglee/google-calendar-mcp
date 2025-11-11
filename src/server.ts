@@ -53,7 +53,7 @@ export class GoogleCalendarMcpServer {
 
   private async executeWithHandler(handler: any, args: any): Promise<{ content: Array<{ type: "text"; text: string }> }> {
     // Extract auth tokens from request parameters if provided
-    const { access_token, refresh_token, ...toolArgs } = args;
+    const { access_token, refresh_token, expiry_date, ...toolArgs } = args;
     
     // Create an OAuth2Client instance with tokens from parameters
     let authClient = this.oauth2Client;
@@ -63,7 +63,8 @@ export class GoogleCalendarMcpServer {
       authClient = await initializeOAuth2Client();
       authClient.setCredentials({
         access_token: access_token,
-        refresh_token: refresh_token
+        refresh_token: refresh_token,
+        expiry_date: expiry_date ? Number(expiry_date) : undefined
       });
     } else {
       // Fall back to checking stored tokens
