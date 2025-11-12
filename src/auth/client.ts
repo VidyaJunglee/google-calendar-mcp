@@ -1,6 +1,6 @@
 import { OAuth2Client } from 'google-auth-library';
 import * as fs from 'fs/promises';
-import { getKeysFilePath, generateCredentialsErrorMessage, OAuthCredentials } from './utils.js';
+import { getKeysFilePath,  OAuthCredentials } from './utils.js';
 
 async function loadCredentialsFromFile(): Promise<OAuthCredentials> {
   const keysContent = await fs.readFile(getKeysFilePath(), "utf-8");
@@ -27,9 +27,7 @@ async function loadCredentialsWithFallback(): Promise<OAuthCredentials> {
   try {
     return await loadCredentialsFromFile();
   } catch (fileError) {
-    // Generate helpful error message
-    const errorMessage = generateCredentialsErrorMessage();
-    throw new Error(`${errorMessage}\n\nOriginal error: ${fileError instanceof Error ? fileError.message : fileError}`);
+    throw new Error(`Failed to load OAuth credentials: ${fileError instanceof Error ? fileError.message : fileError}`);
   }
 }
 

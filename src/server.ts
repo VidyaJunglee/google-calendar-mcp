@@ -4,8 +4,6 @@ import { OAuth2Client } from "google-auth-library";
 
 // Import authentication components
 import { initializeOAuth2Client } from './auth/client.js';
-import { AuthServer } from './auth/server.js';
-import { TokenManager } from './auth/tokenManager.js';
 
 // Import tool registry
 import { ToolRegistry } from './tools/registry.js';
@@ -20,8 +18,6 @@ import { ServerConfig } from './config/TransportConfig.js';
 export class GoogleCalendarMcpServer {
   private server: McpServer;
   private oauth2Client!: OAuth2Client;
-  private tokenManager!: TokenManager;
-  private authServer!: AuthServer;
   private config: ServerConfig;
 
   constructor(config: ServerConfig) {
@@ -35,8 +31,6 @@ export class GoogleCalendarMcpServer {
   async initialize(): Promise<void> {
     // 1. Initialize Authentication (but don't block on it)
     this.oauth2Client = await initializeOAuth2Client();
-    this.tokenManager = new TokenManager(this.oauth2Client);
-    this.authServer = new AuthServer(this.oauth2Client);
 
     // 2. Set up Modern Tool Definitions
     this.registerTools();
@@ -52,32 +46,27 @@ export class GoogleCalendarMcpServer {
   }
 
   private async executeWithHandler(handler: any, args: any): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-    // Extract auth tokens from request parameters if provided
+    // Extract auth tokens from request parameters
     const { access_token, refresh_token, expiry_date, ...toolArgs } = args;
     
-    // Create an OAuth2Client instance with tokens from parameters
-    let authClient = this.oauth2Client;
+    // Log to stderr to avoid breaking JSONRPC protocol on stdout
+    process.stderr.write(`[DEBUG] Executing tool with args: ${JSON.stringify(args, null, 2)}\n`);
     
-    if (access_token || refresh_token) {
-      // Use tokens from request parameters
-      authClient = await initializeOAuth2Client();
-      authClient.setCredentials({
-        access_token: access_token,
-        refresh_token: refresh_token,
-        expiry_date: expiry_date ? Number(expiry_date) : undefined
-      });
-    } else {
-      // Fall back to checking stored tokens
-      if (await this.tokenManager.validateTokens()) {
-        // Use existing stored tokens
-        authClient = this.oauth2Client;
-      } else {
-        throw new McpError(
-          ErrorCode.InvalidRequest,
-          "[GOOGLE_AUTH_ERROR] Authentication required. Please provide access_token and refresh_token as parameters."
-        );
-      }
+    // Tokens must be provided as parameters
+    if (!access_token || !refresh_token) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        "[GOOGLE_AUTH_ERROR] Authentication required. Please provide access_token and refresh_token as parameters."
+      );
     }
+    
+    // Create an OAuth2Client instance with tokens from parameters
+    const authClient = await initializeOAuth2Client();
+    authClient.setCredentials({
+      access_token: access_token,
+      refresh_token: refresh_token,
+      expiry_date: expiry_date ? Number(expiry_date) : undefined
+    });
     
     const result = await handler.runTool(toolArgs, authClient);
     return result;
@@ -107,10 +96,6 @@ export class GoogleCalendarMcpServer {
   private setupGracefulShutdown(): void {
     const cleanup = async () => {
       try {
-        if (this.authServer) {
-          await this.authServer.stop();
-        }
-        
         // McpServer handles transport cleanup automatically
         this.server.close();
         

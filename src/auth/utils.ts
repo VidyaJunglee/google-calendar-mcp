@@ -103,28 +103,3 @@ export function getCredentialsProjectId(): string | undefined {
     return undefined;
   }
 }
-
-// Generate helpful error message for missing credentials
-export function generateCredentialsErrorMessage(): string {
-  return `
-OAuth credentials not found. Please provide credentials using one of these methods:
-
-1. Environment variable:
-   Set GOOGLE_OAUTH_CREDENTIALS to the path of your credentials file:
-   export GOOGLE_OAUTH_CREDENTIALS="/path/to/gcp-oauth.keys.json"
-
-2. Default file path:
-   Place your gcp-oauth.keys.json file in the package root directory.
-
-Token storage:
-- Tokens are saved to: ${getSecureTokenPath()}
-- To use a custom token location, set GOOGLE_CALENDAR_MCP_TOKEN_PATH environment variable
-
-To get OAuth credentials:
-1. Go to the Google Cloud Console (https://console.cloud.google.com/)
-2. Create or select a project
-3. Enable the Google Calendar API
-4. Create OAuth 2.0 credentials
-5. Download the credentials file as gcp-oauth.keys.json
-`.trim();
-}

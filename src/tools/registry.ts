@@ -685,19 +685,30 @@ export class ToolRegistry {
           inputSchema: tool.customInputSchema || this.extractSchemaShape(tool.schema)
         },
         async (args: any) => {
+          // Extract and preserve auth tokens before validation
+          const { access_token, refresh_token, expiry_date, ...toolSpecificArgs } = args;
+          
           // Preprocess: Normalize datetime fields (convert object format to string format)
           // This allows accepting both formats while keeping schemas simple
-          const normalizedArgs = this.normalizeDateTimeFields(tool.name, args);
+          const normalizedArgs = this.normalizeDateTimeFields(tool.name, toolSpecificArgs);
 
-          // Validate input using our Zod schema
+          // Validate input using our Zod schema (only tool-specific args)
           const validatedArgs = tool.schema.parse(normalizedArgs);
 
           // Apply any custom handler function preprocessing
           const processedArgs = tool.handlerFunction ? await tool.handlerFunction(validatedArgs) : validatedArgs;
 
+          // Re-attach auth tokens for executeWithHandler
+          const argsWithAuth = {
+            ...processedArgs,
+            access_token,
+            refresh_token,
+            expiry_date
+          };
+
           // Create handler instance and execute
           const handler = new tool.handler();
-          return executeWithHandler(handler, processedArgs);
+          return executeWithHandler(handler, argsWithAuth);
         }
       );
     }
