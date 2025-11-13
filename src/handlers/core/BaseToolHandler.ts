@@ -13,12 +13,12 @@ export abstract class BaseToolHandler {
         if (error instanceof GaxiosError) {
             const status = error.response?.status;
             const errorData = error.response?.data;
-
+            process.stderr.write(`[DEBUG] Google API Error Response: ${JSON.stringify(errorData, null, 2)}\n`);
             // Handle specific Google API errors with appropriate MCP error codes
             if (errorData?.error === 'invalid_grant') {
                 throw new McpError(
                     ErrorCode.InvalidRequest,
-                    'Authentication token is invalid or expired. Please re-run the authentication process (e.g., `npm run auth`).'
+                    '[GOOGLE_AUTH_ERROR] Authentication token is invalid or expired. Please re-run the authentication process (e.g., `npm run auth`).'
                 );
             }
 

@@ -47,10 +47,37 @@ export class GoogleCalendarMcpServer {
 
   private async executeWithHandler(handler: any, args: any): Promise<{ content: Array<{ type: "text"; text: string }> }> {
     // Extract auth tokens from request parameters
-    const { access_token, refresh_token, expiry_date, ...toolArgs } = args;
+    let { access_token, refresh_token, expiry_date, ...toolArgs } = args;
     
     // Log to stderr to avoid breaking JSONRPC protocol on stdout
     process.stderr.write(`[DEBUG] Executing tool with args: ${JSON.stringify(args, null, 2)}\n`);
+    
+    // Parse token parameters if they are JSON strings (from external systems)
+    try {
+      if (typeof access_token === 'string' && access_token.startsWith('{')) {
+        const parsed = JSON.parse(access_token);
+        if (parsed.success && parsed.tokens && parsed.tokens.google) {
+          access_token = parsed.tokens.google.access_token;
+        }
+      }
+      
+      if (typeof refresh_token === 'string' && refresh_token.startsWith('{')) {
+        const parsed = JSON.parse(refresh_token);
+        if (parsed.success && parsed.tokens && parsed.tokens.google) {
+          refresh_token = parsed.tokens.google.refresh_token;
+        }
+      }
+      
+      if (typeof expiry_date === 'string' && expiry_date.startsWith('{')) {
+        const parsed = JSON.parse(expiry_date);
+        if (parsed.success && parsed.tokens && parsed.tokens.google) {
+          expiry_date = parsed.tokens.google.expires_at?.toString();
+        }
+      }
+    } catch (parseError) {
+      process.stderr.write(`[DEBUG] Token parsing failed: ${parseError instanceof Error ? parseError.message : parseError}\n`);
+      // Continue with original values if parsing fails
+    }
     
     // Tokens must be provided as parameters
     if (!access_token || !refresh_token) {

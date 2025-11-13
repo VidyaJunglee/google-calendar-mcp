@@ -139,7 +139,7 @@ describe('Batch List Events Functionality', () => {
     it('should reject invalid time format', () => {
       const input = {
         calendarId: 'primary',
-        timeMin: '2024-01-01' // Missing time and timezone
+        timeMin: 'invalid-date-format' // Truly invalid format
       };
 
       const result = ListEventsArgumentsSchema.safeParse(input);

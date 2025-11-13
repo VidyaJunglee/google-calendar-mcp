@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { BaseToolHandler } from "../handlers/core/BaseToolHandler.js";
 import { ALLOWED_EVENT_FIELDS } from "../utils/field-mask-builder.js";
+import { parseNaturalDateTime } from "../utils/natural-datetime-parser.js";
 
 // Import all handlers
 import { ListCalendarsHandler } from "../handlers/core/ListCalendarsHandler.js";
@@ -27,23 +28,36 @@ const authTokenSchemas = {
   expiry_date: z.string().optional().describe("Optional OAuth2 token expiry date in milliseconds since epoch (as string)")
 };
 
-const timeMinSchema = z.string()
-  .refine((val) => {
-    const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-    const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-    return withTimezone || withoutTimezone;
-  }, "Must be ISO 8601 format: '2026-01-01T00:00:00'")
-  .describe("Start time boundary. Preferred: '2024-01-01T00:00:00' (uses timeZone parameter or calendar timezone). Also accepts: '2024-01-01T00:00:00Z' or '2024-01-01T00:00:00-08:00'.")
-  .optional();
+// Create flexible datetime schema that supports both ISO 8601 and natural language
+const createFlexibleDateTimeSchema = (description: string, timezone?: string) => {
+  return z.string()
+    .transform((val) => {
+      // Check if it's already ISO 8601 format
+      const isoPattern = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})?)?$/;
+      if (isoPattern.test(val)) {
+        return val; // Already in correct format
+      }
+      
+      // Parse natural language (use UTC as default if no timezone provided)
+      const parsed = parseNaturalDateTime(val, timezone || 'UTC');
+      return parsed.datetime;
+    })
+    .refine((val) => {
+      const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(val);
+      const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
+      const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
+      return dateOnly || withTimezone || withoutTimezone;
+    }, "Must be ISO 8601 format or natural language like 'today 8pm', 'tomorrow 2:30pm'")
+    .describe(description);
+};
 
-const timeMaxSchema = z.string()
-  .refine((val) => {
-    const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-    const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-    return withTimezone || withoutTimezone;
-  }, "Must be ISO 8601 format: '2026-01-01T00:00:00'")
-  .describe("End time boundary. Preferred: '2024-01-01T23:59:59' (uses timeZone parameter or calendar timezone). Also accepts: '2024-01-01T23:59:59Z' or '2024-01-01T23:59:59-08:00'.")
-  .optional();
+const timeMinSchema = createFlexibleDateTimeSchema(
+  "Start time boundary. Accepts ISO 8601 ('2024-01-01T00:00:00') or natural language ('today 8pm', 'tomorrow 2:30pm'). Uses timeZone parameter or calendar timezone for context."
+).optional();
+
+const timeMaxSchema = createFlexibleDateTimeSchema(
+  "End time boundary. Accepts ISO 8601 ('2024-01-01T23:59:59') or natural language ('today 11pm', 'tomorrow 5pm'). Uses timeZone parameter or calendar timezone for context."
+).optional();
 
 const timeZoneSchema = z.string().optional().describe(
   "Timezone as IANA Time Zone Database name (e.g., America/Los_Angeles). Takes priority over calendar's default timezone. Only used for timezone-naive datetime strings."
@@ -102,38 +116,16 @@ export const ToolSchemas = {
     query: z.string().describe(
       "Free text search query (searches summary, description, location, attendees, etc.)"
     ),
-    timeMin: z.string()
-      .refine((val) => {
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2026-01-01T00:00:00'")
-      .describe("Start time boundary. Preferred: '2024-01-01T00:00:00' (uses timeZone parameter or calendar timezone). Also accepts: '2024-01-01T00:00:00Z' or '2024-01-01T00:00:00-08:00'."),
-    timeMax: z.string()
-      .refine((val) => {
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2026-01-01T00:00:00'")
-      .describe("End time boundary. Preferred: '2024-01-01T23:59:59' (uses timeZone parameter or calendar timezone). Also accepts: '2024-01-01T23:59:59Z' or '2024-01-01T23:59:59-08:00'."),
-    timeZone: z.string().optional().describe(
-      "Timezone as IANA Time Zone Database name (e.g., America/Los_Angeles). Takes priority over calendar's default timezone. Only used for timezone-naive datetime strings."
+    timeMin: createFlexibleDateTimeSchema(
+      "Start time boundary. Accepts ISO 8601 ('2024-01-01T00:00:00') or natural language ('today 8pm', 'tomorrow 2:30pm'). Uses timeZone parameter or calendar timezone for context."
     ),
-    fields: z.array(z.enum(ALLOWED_EVENT_FIELDS)).optional().describe(
-      "Optional array of additional event fields to retrieve. Available fields are strictly validated. Default fields (id, summary, start, end, status, htmlLink, location, attendees) are always included."
+    timeMax: createFlexibleDateTimeSchema(
+      "End time boundary. Accepts ISO 8601 ('2024-01-01T23:59:59') or natural language ('today 11pm', 'tomorrow 5pm'). Uses timeZone parameter or calendar timezone for context."
     ),
-    privateExtendedProperty: z
-      .array(z.string().regex(/^[^=]+=[^=]+$/, "Must be in key=value format"))
-      .optional()
-      .describe(
-        "Filter by private extended properties (key=value). Matches events that have all specified properties."
-      ),
-    sharedExtendedProperty: z
-      .array(z.string().regex(/^[^=]+=[^=]+$/, "Must be in key=value format"))
-      .optional()
-      .describe(
-        "Filter by shared extended properties (key=value). Matches events that have all specified properties."
-      )
+    timeZone: timeZoneSchema,
+    fields: fieldsSchema,
+    privateExtendedProperty: privateExtendedPropertySchema,
+    sharedExtendedProperty: sharedExtendedPropertySchema
   }),
   
   'get-event': z.object({
@@ -155,22 +147,12 @@ export const ToolSchemas = {
     eventId: z.string().optional().describe("Optional custom event ID (5-1024 characters, base32hex encoding: lowercase letters a-v and digits 0-9 only). If not provided, Google Calendar will generate one."),
     summary: z.string().describe("Title of the event"),
     description: z.string().optional().describe("Description/notes for the event"),
-    start: z.string()
-      .refine((val) => {
-        const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(val);
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return dateOnly || withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2025-01-01T10:00:00' for timed events or '2025-01-01' for all-day events")
-      .describe("Event start time: '2025-01-01T10:00:00' for timed events or '2025-01-01' for all-day events. Also accepts Google Calendar API object format: {date: '2025-01-01'} or {dateTime: '2025-01-01T10:00:00', timeZone: 'America/Los_Angeles'}"),
-    end: z.string()
-      .refine((val) => {
-        const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(val);
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return dateOnly || withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2025-01-01T11:00:00' for timed events or '2025-01-02' for all-day events")
-      .describe("Event end time: '2025-01-01T11:00:00' for timed events or '2025-01-02' for all-day events (exclusive). Also accepts Google Calendar API object format: {date: '2025-01-02'} or {dateTime: '2025-01-01T11:00:00', timeZone: 'America/Los_Angeles'}"),
+    start: createFlexibleDateTimeSchema(
+      "Event start time. Accepts ISO 8601 ('2025-01-01T10:00:00') or natural language ('today 10am', 'tomorrow 2pm'). For all-day events use date only ('2025-01-01' or 'today')."
+    ),
+    end: createFlexibleDateTimeSchema(
+      "Event end time. Accepts ISO 8601 ('2025-01-01T11:00:00') or natural language ('today 11am', 'tomorrow 3pm'). For all-day events use next day ('2025-01-02' or 'tomorrow')."
+    ),
     timeZone: z.string().optional().describe(
       "Timezone as IANA Time Zone Database name (e.g., America/Los_Angeles). Takes priority over calendar's default timezone. Only used for timezone-naive datetime strings."
     ),
@@ -269,24 +251,12 @@ export const ToolSchemas = {
     eventId: z.string().describe("ID of the event to update"),
     summary: z.string().optional().describe("Updated title of the event"),
     description: z.string().optional().describe("Updated description/notes"),
-    start: z.string()
-      .refine((val) => {
-        const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(val);
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return dateOnly || withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2025-01-01T10:00:00' for timed events or '2025-01-01' for all-day events")
-      .describe("Updated start time: '2025-01-01T10:00:00' for timed events or '2025-01-01' for all-day events. Also accepts Google Calendar API object format: {date: '2025-01-01'} or {dateTime: '2025-01-01T10:00:00', timeZone: 'America/Los_Angeles'}")
-      .optional(),
-    end: z.string()
-      .refine((val) => {
-        const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(val);
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return dateOnly || withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2025-01-01T11:00:00' for timed events or '2025-01-02' for all-day events")
-      .describe("Updated end time: '2025-01-01T11:00:00' for timed events or '2025-01-02' for all-day events (exclusive). Also accepts Google Calendar API object format: {date: '2025-01-02'} or {dateTime: '2025-01-01T11:00:00', timeZone: 'America/Los_Angeles'}")
-      .optional(),
+    start: createFlexibleDateTimeSchema(
+      "Updated start time. Accepts ISO 8601 ('2025-01-01T10:00:00') or natural language ('today 10am', 'tomorrow 2pm'). For all-day events use date only ('2025-01-01' or 'today')."
+    ).optional(),
+    end: createFlexibleDateTimeSchema(
+      "Updated end time. Accepts ISO 8601 ('2025-01-01T11:00:00') or natural language ('today 11am', 'tomorrow 3pm'). For all-day events use next day ('2025-01-02' or 'tomorrow')."
+    ).optional(),
     timeZone: z.string().optional().describe("Updated timezone as IANA Time Zone Database name. If not provided, uses the calendar's default timezone."),
     location: z.string().optional().describe("Updated location"),
     attendees: z.array(z.object({
@@ -307,22 +277,12 @@ export const ToolSchemas = {
     modificationScope: z.enum(["thisAndFollowing", "all", "thisEventOnly"]).optional().describe(
       "Scope for recurring event modifications"
     ),
-    originalStartTime: z.string()
-      .refine((val) => {
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2026-01-01T00:00:00'")
-      .describe("Original start time in the ISO 8601 format '2024-01-01T10:00:00'")
-      .optional(),
-    futureStartDate: z.string()
-      .refine((val) => {
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2026-01-01T00:00:00'")
-      .describe("Start date for future instances in the ISO 8601 format '2024-01-01T10:00:00'")
-      .optional(),
+    originalStartTime: createFlexibleDateTimeSchema(
+      "Original start time. Accepts ISO 8601 ('2024-01-01T10:00:00') or natural language ('today 10am', 'tomorrow 2pm'). Required when modificationScope is 'thisEventOnly'."
+    ).optional(),
+    futureStartDate: createFlexibleDateTimeSchema(
+      "Start date for future instances. Accepts ISO 8601 ('2024-01-01T10:00:00') or natural language ('today 10am', 'tomorrow 2pm'). Required when modificationScope is 'thisAndFollowing'."
+    ).optional(),
     checkConflicts: z.boolean().optional().describe(
       "Whether to check for conflicts when updating (default: true when changing time)"
     ),
@@ -422,21 +382,13 @@ export const ToolSchemas = {
     })).describe(
       "List of calendars and/or groups to query for free/busy information"
     ),
-    timeMin: z.string()
-      .refine((val) => {
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2026-01-01T00:00:00'")
-      .describe("Start time boundary. Preferred: '2024-01-01T00:00:00' (uses timeZone parameter or calendar timezone). Also accepts: '2024-01-01T00:00:00Z' or '2024-01-01T00:00:00-08:00'."),
-    timeMax: z.string()
-      .refine((val) => {
-        const withTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/.test(val);
-        const withoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val);
-        return withTimezone || withoutTimezone;
-      }, "Must be ISO 8601 format: '2026-01-01T00:00:00'")
-      .describe("End time boundary. Preferred: '2024-01-01T23:59:59' (uses timeZone parameter or calendar timezone). Also accepts: '2024-01-01T23:59:59Z' or '2024-01-01T23:59:59-08:00'."),
-    timeZone: z.string().optional().describe("Timezone for the query"),
+    timeMin: createFlexibleDateTimeSchema(
+      "Start time boundary. Accepts ISO 8601 ('2024-01-01T00:00:00') or natural language ('today 8pm', 'tomorrow 2:30pm'). Uses timeZone parameter or calendar timezone for context."
+    ),
+    timeMax: createFlexibleDateTimeSchema(
+      "End time boundary. Accepts ISO 8601 ('2024-01-01T23:59:59') or natural language ('today 11pm', 'tomorrow 5pm'). Uses timeZone parameter or calendar timezone for context."
+    ),
+    timeZone: timeZoneSchema,
     groupExpansionMax: z.number().int().max(100).optional().describe(
       "Maximum number of calendars to expand per group (max 100)"
     ),
@@ -646,13 +598,13 @@ export class ToolRegistry {
    */
   private static normalizeDateTimeFields(toolName: string, args: any): any {
     // Only normalize for tools that have datetime fields
-    const toolsWithDateTime = ['create-event', 'update-event'];
+    const toolsWithDateTime = ['create-event', 'update-event', 'search-events', 'get-freebusy'];
     if (!toolsWithDateTime.includes(toolName)) {
       return args;
     }
 
     const normalized = { ...args };
-    const dateTimeFields = ['start', 'end', 'originalStartTime', 'futureStartDate'];
+    const dateTimeFields = ['start', 'end', 'originalStartTime', 'futureStartDate', 'timeMin', 'timeMax'];
 
     for (const field of dateTimeFields) {
       if (normalized[field] && typeof normalized[field] === 'object') {
