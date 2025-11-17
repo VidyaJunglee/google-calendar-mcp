@@ -83,11 +83,11 @@ const sharedExtendedPropertySchema = z
 
 // Define all tool schemas with TypeScript inference
 export const ToolSchemas = {
-  'list-calendars': z.object({
+  'list-google-calendar-calendars': z.object({
     ...authTokenSchemas
   }),
 
-  'list-events': z.object({
+  'list-google-calendar-events': z.object({
     ...authTokenSchemas,
     calendarId: z.union([
       z.string().describe(
@@ -110,7 +110,7 @@ export const ToolSchemas = {
     sharedExtendedProperty: sharedExtendedPropertySchema
   }),
   
-  'search-events': z.object({
+  'search-google-calendar-events': z.object({
     ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     query: z.string().describe(
@@ -128,7 +128,7 @@ export const ToolSchemas = {
     sharedExtendedProperty: sharedExtendedPropertySchema
   }),
   
-  'get-event': z.object({
+  'get-google-calendar-event': z.object({
     ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     eventId: z.string().describe("ID of the event to retrieve"),
@@ -137,11 +137,11 @@ export const ToolSchemas = {
     )
   }),
 
-  'list-colors': z.object({
+  'list-google-calendar-colors': z.object({
     ...authTokenSchemas
   }),
   
-  'create-event': z.object({
+  'create-google-calendar-event': z.object({
     ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     eventId: z.string().optional().describe("Optional custom event ID (5-1024 characters, base32hex encoding: lowercase letters a-v and digits 0-9 only). If not provided, Google Calendar will generate one."),
@@ -245,7 +245,7 @@ export const ToolSchemas = {
     )
   }),
   
-  'update-event': z.object({
+  'update-google-calendar-event': z.object({
     ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     eventId: z.string().describe("ID of the event to update"),
@@ -366,7 +366,7 @@ export const ToolSchemas = {
     }
   ),
   
-  'delete-event': z.object({
+  'delete-google-calendar-event': z.object({
     ...authTokenSchemas,
     calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
     eventId: z.string().describe("ID of the event to delete"),
@@ -375,7 +375,7 @@ export const ToolSchemas = {
     )
   }),
   
-  'get-freebusy': z.object({
+  'get-google-calendar-freebusy': z.object({
     ...authTokenSchemas,
     calendars: z.array(z.object({
       id: z.string().describe("ID of the calendar (use 'primary' for the main calendar)")
@@ -397,7 +397,7 @@ export const ToolSchemas = {
     )
   }),
   
-  'get-current-time': z.object({
+  'get-google-calendar-current-time': z.object({
     ...authTokenSchemas,
     timeZone: z.string().optional().describe(
       "Optional IANA timezone (e.g., 'America/Los_Angeles', 'Europe/London', 'UTC'). If not provided, uses the primary Google Calendar's default timezone."
@@ -411,16 +411,16 @@ export type ToolInputs = {
 };
 
 // Export individual types for convenience
-export type ListCalendarsInput = ToolInputs['list-calendars'];
-export type ListEventsInput = ToolInputs['list-events'];
-export type SearchEventsInput = ToolInputs['search-events'];
-export type GetEventInput = ToolInputs['get-event'];
-export type ListColorsInput = ToolInputs['list-colors'];
-export type CreateEventInput = ToolInputs['create-event'];
-export type UpdateEventInput = ToolInputs['update-event'];
-export type DeleteEventInput = ToolInputs['delete-event'];
-export type GetFreeBusyInput = ToolInputs['get-freebusy'];
-export type GetCurrentTimeInput = ToolInputs['get-current-time'];
+export type ListCalendarsInput = ToolInputs['list-google-calendar-calendars'];
+export type ListEventsInput = ToolInputs['list-google-calendar-events'];
+export type SearchEventsInput = ToolInputs['search-google-calendar-events'];
+export type GetEventInput = ToolInputs['get-google-calendar-event'];
+export type ListColorsInput = ToolInputs['list-google-calendar-colors'];
+export type CreateEventInput = ToolInputs['create-google-calendar-event'];
+export type UpdateEventInput = ToolInputs['update-google-calendar-event'];
+export type DeleteEventInput = ToolInputs['delete-google-calendar-event'];
+export type GetFreeBusyInput = ToolInputs['get-google-calendar-freebusy'];
+export type GetCurrentTimeInput = ToolInputs['get-google-calendar-current-time'];
 
 interface ToolDefinition {
   name: keyof typeof ToolSchemas;
@@ -457,15 +457,15 @@ export class ToolRegistry {
 
   private static tools: ToolDefinition[] = [
     {
-      name: "list-calendars",
+      name: "list-google-calendar-calendars",
       description: "List all available calendars",
-      schema: ToolSchemas['list-calendars'],
+      schema: ToolSchemas['list-google-calendar-calendars'],
       handler: ListCalendarsHandler
     },
     {
-      name: "list-events",
+      name: "list-google-calendar-events",
       description: "List events from one or more calendars. Supports both calendar IDs and calendar names.",
-      schema: ToolSchemas['list-events'],
+      schema: ToolSchemas['list-google-calendar-events'],
       handler: ListEventsHandler,
       handlerFunction: async (args: ListEventsInput & { calendarId: string | string[] }) => {
         let processedCalendarId: string | string[] = args.calendarId;
@@ -529,51 +529,51 @@ export class ToolRegistry {
       }
     },
     {
-      name: "search-events",
+      name: "search-google-calendar-events",
       description: "Search for events in a calendar by text query.",
-      schema: ToolSchemas['search-events'],
+      schema: ToolSchemas['search-google-calendar-events'],
       handler: SearchEventsHandler
     },
     {
-      name: "get-event",
+      name: "get-google-calendar-event",
       description: "Get details of a specific event by ID.",
-      schema: ToolSchemas['get-event'],
+      schema: ToolSchemas['get-google-calendar-event'],
       handler: GetEventHandler
     },
     {
-      name: "list-colors",
+      name: "list-google-calendar-colors",
       description: "List available color IDs and their meanings for calendar events",
-      schema: ToolSchemas['list-colors'],
+      schema: ToolSchemas['list-google-calendar-colors'],
       handler: ListColorsHandler
     },
     {
-      name: "create-event",
+      name: "create-google-calendar-event",
       description: "Create a new calendar event.",
-      schema: ToolSchemas['create-event'],
+      schema: ToolSchemas['create-google-calendar-event'],
       handler: CreateEventHandler
     },
     {
-      name: "update-event",
+      name: "update-google-calendar-event",
       description: "Update an existing calendar event with recurring event modification scope support.",
-      schema: ToolSchemas['update-event'],
+      schema: ToolSchemas['update-google-calendar-event'],
       handler: UpdateEventHandler
     },
     {
-      name: "delete-event",
+      name: "delete-google-calendar-event",
       description: "Delete a calendar event.",
-      schema: ToolSchemas['delete-event'],
+      schema: ToolSchemas['delete-google-calendar-event'],
       handler: DeleteEventHandler
     },
     {
-      name: "get-freebusy",
+      name: "get-google-calendar-freebusy",
       description: "Query free/busy information for calendars. Note: Time range is limited to a maximum of 3 months between timeMin and timeMax.",
-      schema: ToolSchemas['get-freebusy'],
+      schema: ToolSchemas['get-google-calendar-freebusy'],
       handler: FreeBusyEventHandler
     },
     {
-      name: "get-current-time",
+      name: "get-google-calendar-current-time",
       description: "Get current time in the primary Google Calendar's timezone (or a requested timezone).",
-      schema: ToolSchemas['get-current-time'],
+      schema: ToolSchemas['get-google-calendar-current-time'],
       handler: GetCurrentTimeHandler
     }
   ];
@@ -598,7 +598,7 @@ export class ToolRegistry {
    */
   private static normalizeDateTimeFields(toolName: string, args: any): any {
     // Only normalize for tools that have datetime fields
-    const toolsWithDateTime = ['create-event', 'update-event', 'search-events', 'get-freebusy'];
+    const toolsWithDateTime = ['create-google-calendar-event', 'update-google-calendar-event', 'search-google-calendar-events', 'get-google-calendar-freebusy'];
     if (!toolsWithDateTime.includes(toolName)) {
       return args;
     }
