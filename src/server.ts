@@ -4,6 +4,7 @@ import { OAuth2Client } from "google-auth-library";
 
 // Import authentication components
 import { initializeOAuth2Client } from './auth/client.js';
+import { getAuthenticatedClient } from './auth/tokenFetcher.js';
 
 // Import tool registry
 import { ToolRegistry } from './tools/registry.js';
@@ -46,54 +47,22 @@ export class GoogleCalendarMcpServer {
   }
 
   private async executeWithHandler(handler: any, args: any): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-    // Extract auth tokens from request parameters
-    let { access_token, refresh_token, expiry_date, ...toolArgs } = args;
+    // Extract user_id and provider from request parameters
+    const { user_id, provider, ...toolArgs } = args;
     
     // Log to stderr to avoid breaking JSONRPC protocol on stdout
     process.stderr.write(`[DEBUG] Executing tool with args: ${JSON.stringify(args, null, 2)}\n`);
     
-    // Parse token parameters if they are JSON strings (from external systems)
-    try {
-      if (typeof access_token === 'string' && access_token.startsWith('{')) {
-        const parsed = JSON.parse(access_token);
-        if (parsed.success && parsed.tokens && parsed.tokens.google) {
-          access_token = parsed.tokens.google.access_token;
-        }
-      }
-      
-      if (typeof refresh_token === 'string' && refresh_token.startsWith('{')) {
-        const parsed = JSON.parse(refresh_token);
-        if (parsed.success && parsed.tokens && parsed.tokens.google) {
-          refresh_token = parsed.tokens.google.refresh_token;
-        }
-      }
-      
-      if (typeof expiry_date === 'string' && expiry_date.startsWith('{')) {
-        const parsed = JSON.parse(expiry_date);
-        if (parsed.success && parsed.tokens && parsed.tokens.google) {
-          expiry_date = parsed.tokens.google.expires_at?.toString();
-        }
-      }
-    } catch (parseError) {
-      process.stderr.write(`[DEBUG] Token parsing failed: ${parseError instanceof Error ? parseError.message : parseError}\n`);
-      // Continue with original values if parsing fails
-    }
-    
-    // Tokens must be provided as parameters
-    if (!access_token || !refresh_token) {
+    // Validate required parameters
+    if (!user_id || !provider) {
       throw new McpError(
         ErrorCode.InvalidRequest,
-        "[GOOGLE_AUTH_ERROR] Authentication required. Please provide access_token and refresh_token as parameters."
+        "[AUTH_ERROR] Authentication required. Please provide user_id and provider as parameters."
       );
     }
     
-    // Create an OAuth2Client instance with tokens from parameters
-    const authClient = await initializeOAuth2Client();
-    authClient.setCredentials({
-      access_token: access_token,
-      refresh_token: refresh_token,
-      expiry_date: expiry_date ? Number(expiry_date) : undefined
-    });
+    // Fetch tokens and create authenticated OAuth2Client
+    const authClient = await getAuthenticatedClient(user_id, provider);
     
     const result = await handler.runTool(toolArgs, authClient);
     return result;
