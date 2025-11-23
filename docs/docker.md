@@ -101,7 +101,7 @@ cp /path/to/your/gcp-oauth.keys.json ./gcp-oauth.keys.json
 chmod 644 ./gcp-oauth.keys.json
 
 # Configure for HTTP mode
-# Copy .env.example which has defaults (TRANSPORT=stdio, HOST=0.0.0.0, PORT=3000)
+# Copy .env.example which has defaults (TRANSPORT=stdio, HOST=0.0.0.0, PORT=5000)
 cp .env.example .env
 
 # Change TRANSPORT to http (other defaults are already correct)
@@ -122,7 +122,7 @@ docker compose exec calendar-mcp npm run auth
 # in which case the tokens expire after 7 days 
 
 # Verify server is running
-curl http://localhost:3000/health
+curl http://localhost:5000/health
 # Should return: {"status":"healthy","server":"google-calendar-mcp","timestamp":"YYYY-MM-DDT00:00:00.000"}
 ```
 
@@ -132,7 +132,7 @@ curl http://localhost:3000/health
 bash examples/http-with-curl.sh
 
 # Or test specific endpoint
-bash examples/http-with-curl.sh http://localhost:3000
+bash examples/http-with-curl.sh http://localhost:5000
 ```
 
 #### Step 4: Claude Desktop HTTP Configuration
@@ -146,7 +146,7 @@ Add to your Claude Desktop config file:
   "mcpServers": {
     "google-calendar": {
       "command": "mcp-client",
-      "args": ["http://localhost:3000"]
+      "args": ["http://localhost:5000"]
     }
   }
 }
@@ -163,7 +163,7 @@ If you modify the source code and want to see your changes reflected in the Dock
 docker compose build && docker compose up -d
 
 # Verify changes are applied (check timestamp updates)
-curl http://localhost:3000/health
+curl http://localhost:5000/health
 ```
 
 **Why rebuild?** The Docker image contains a built snapshot of your code. Changes to source files won't appear until you rebuild the image with `docker compose build`.

@@ -17,10 +17,10 @@ services:
     
     # Expose ports for HTTP mode
     ports:
-      - "3000:3000"  # HTTP mode MCP server
+      - "5000:5000"  # HTTP mode MCP server
     
     # Command to start the server in HTTP mode
-    command: node build/index.js --transport http --port 3000 --host 0.0.0.0
+    command: node build/index.js --transport http --port 5000 --host 0.0.0.0
     
     # Resource limits for production stability
     deploy:
@@ -38,7 +38,7 @@ services:
     
     # Health check for HTTP mode
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -26,19 +26,7 @@ const commands = {
     args: ['build/index.js', '--transport', 'http', '--port', '3000', '--host', '0.0.0.0']
   },
 
-  // Authentication Management
-  'auth': {
-    description: 'Manually authenticate normal account',
-    cmd: 'node',
-    args: ['build/auth-server.js'],
-    env: { GOOGLE_ACCOUNT_MODE: 'normal' }
-  },
-  'auth:test': {
-    description: 'Authenticate test account',
-    cmd: 'node',
-    args: ['build/auth-server.js'],
-    env: { GOOGLE_ACCOUNT_MODE: 'test' }
-  },
+  // Account Management  
   'account:status': {
     description: 'Check account status and configuration',
     cmd: 'node',
@@ -125,11 +113,6 @@ const commands = {
     cmd: 'docker',
     args: ['compose', 'exec', 'calendar-mcp', 'sh']
   },
-  'docker:auth': {
-    description: 'Authenticate OAuth in Docker container',
-    cmd: 'docker',
-    args: ['compose', 'exec', 'calendar-mcp', 'npm', 'run', 'auth']
-  },
   'docker:test:quick': {
     description: 'Run quick Docker tests (no OAuth required)',
     cmd: 'bash',
@@ -145,10 +128,10 @@ function showHelp() {
 
   const categories = {
     'HTTP Transport': ['http', 'http:public'],
-    'Authentication': ['auth', 'auth:test', 'account:status', 'account:clear:normal', 'account:clear:test'],
+    'Account Management': ['account:status', 'account:clear:normal', 'account:clear:test'],
     'Unit Testing': ['test'],
     'Integration Testing': ['test:integration:direct', 'test:integration:claude', 'test:integration:openai', 'test:integration:all', 'test:watch:all'],
-    'Docker Operations': ['docker:build', 'docker:up', 'docker:up:http', 'docker:auth', 'docker:logs', 'docker:down', 'docker:exec', 'docker:test:quick'],
+    'Docker Operations': ['docker:build', 'docker:up', 'docker:up:http', 'docker:logs', 'docker:down', 'docker:exec', 'docker:test:quick'],
     'Coverage & Analysis': ['coverage']
   };
 
@@ -165,7 +148,6 @@ function showHelp() {
   console.log('Examples:');
   console.log('  npm run dev http                  # Start HTTP server');
   console.log('  npm run dev docker:up             # Start Docker container');
-  console.log('  npm run dev docker:auth           # Authenticate in Docker');
   console.log('  npm run dev test:integration:direct # Run core integration tests');
 }
 

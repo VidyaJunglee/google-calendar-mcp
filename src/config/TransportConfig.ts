@@ -14,7 +14,7 @@ export function parseArgs(args: string[]): ServerConfig {
   const config: ServerConfig = {
     transport: {
       type: (process.env.TRANSPORT as 'stdio' | 'http') || 'stdio',
-      port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
+      port: process.env.PORT ? parseInt(process.env.PORT, 10) : 5000,
       host: process.env.HOST || '127.0.0.1'
     },
     debug: process.env.DEBUG === 'true' || false
@@ -47,7 +47,7 @@ Usage: node build/index.js [options]
 
 Options:
   --transport <type>        Transport type: stdio (default) | http
-  --port <number>          Port for HTTP transport (default: 3000)
+  --port <number>          Port for HTTP transport (default: 5000)
   --host <string>          Host for HTTP transport (default: 127.0.0.1)
   --debug                  Enable debug logging
   --help                   Show this help message
@@ -60,8 +60,8 @@ Environment Variables:
 
 Examples:
   node build/index.js                              # stdio (local use)
-  node build/index.js --transport http --port 3000 # HTTP server
-  PORT=3000 TRANSPORT=http node build/index.js     # Using env vars
+  node build/index.js --transport http --port 5000 # HTTP server
+  PORT=5000 TRANSPORT=http node build/index.js     # Using env vars
         `);
         process.exit(0);
     }

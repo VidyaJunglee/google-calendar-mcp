@@ -2,8 +2,8 @@ import { FastMCP } from "fastmcp";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { OAuth2Client } from "google-auth-library";
 
-// Import authentication components
-import { getAuthenticatedClient } from './auth/tokenFetcher.js';
+// Import auth_handler for authentication
+import { getAuthenticatedClient } from './utils/tokenFetcher.js';
 
 // Import tool registry
 import { ToolRegistry } from './tools/registry.js';
@@ -102,7 +102,7 @@ export class GoogleCalendarMcpServer {
         await this.server.start({
           transportType: 'httpStream',
           httpStream: {
-            port: this.config.transport.port || 3000,
+            port: this.config.transport.port || 5000,
             host: this.config.transport.host || '127.0.0.1',
             stateless: true, // Enable stateless mode as requested
             enableJsonResponse: true // Enable JSON-RPC responses

@@ -3,7 +3,6 @@ import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { OAuth2Client } from "google-auth-library";
 import { GaxiosError } from 'gaxios';
 import { calendar_v3, google } from "googleapis";
-import { getCredentialsProjectId } from "../../auth/utils.js";
 
 
 export abstract class BaseToolHandler {
@@ -123,19 +122,11 @@ Original error: ${errorMessage}`
     }
 
     protected getCalendar(auth: OAuth2Client): calendar_v3.Calendar {
-        // Try to get project ID from credentials file for quota project header
-        const quotaProjectId = getCredentialsProjectId();
-
         const config: any = {
             version: 'v3',
             auth,
             timeout: 3000 // 3 second timeout for API calls
         };
-
-        // Add quota project ID if available
-        if (quotaProjectId) {
-            config.quotaProjectId = quotaProjectId;
-        }
 
         return google.calendar(config);
     }
