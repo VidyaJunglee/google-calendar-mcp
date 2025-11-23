@@ -15,16 +15,12 @@ services:
       - ./gcp-oauth.keys.json:/app/gcp-oauth.keys.json:ro
       - calendar-tokens:/home/nodejs/.config/google-calendar-mcp
     
-    # Expose ports for HTTP mode and OAuth authentication
+    # Expose ports for HTTP mode
     ports:
       - "3000:3000"  # HTTP mode MCP server
-      - "3500:3500"  # OAuth authentication
-      - "3501:3501"
-      - "3502:3502"
-      - "3503:3503"
-      - "3504:3504"
-      - "3505:3505"
     
+    # Command to start the server in HTTP mode
+    command: node build/index.js --transport http --port 3000 --host 0.0.0.0
     
     # Resource limits for production stability
     deploy:
@@ -40,9 +36,9 @@ services:
     security_opt:
       - no-new-privileges:true
     
-    # Health check for HTTP mode (safe for stdio mode too)
+    # Health check for HTTP mode
     healthcheck:
-      test: ["CMD-SHELL", "if [ \"$TRANSPORT\" = \"http\" ]; then curl -f http://localhost:${PORT:-3000}/health || exit 1; else exit 0; fi"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

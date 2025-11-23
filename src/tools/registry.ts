@@ -454,7 +454,7 @@ export class ToolRegistry {
     return schemaAny._def?.schema?.shape || schemaAny.shape;
   }
 
-  private static tools: ToolDefinition[] = [
+  public static tools: ToolDefinition[] = [
     {
       name: "list-google-calendar-calendars",
       description: "List all available calendars",
@@ -647,5 +647,9 @@ export class ToolRegistry {
         }
       );
     }
+  }
+
+  static getTool(name: string): ToolDefinition | undefined {
+    return this.tools.find(t => t.name === name);
   }
 }
