@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { BaseToolHandler } from "../handlers/core/BaseToolHandler.js";
 import { ALLOWED_EVENT_FIELDS } from "../utils/field-mask-builder.js";
+import { randomUUID } from "crypto";
 
 // Import all handlers
 import { ListCalendarsHandler } from "../handlers/core/ListCalendarsHandler.js";
@@ -401,6 +402,65 @@ export const ToolSchemas = {
     timeZone: z.string().optional().describe(
       "Optional IANA timezone (e.g., 'America/Los_Angeles', 'Europe/London', 'UTC'). If not provided, uses the primary Google Calendar's default timezone."
     )
+  }),
+
+  // --- Google Meet Tools ---
+  'create-google-meet': z.object({
+    ...authParameterSchemas,
+    calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
+    summary: z.string().describe("Title of the meeting"),
+    description: z.string().optional().describe("Description/notes for the meeting"),
+    start: createFlexibleDateTimeSchema(
+      "Meeting start time. Accepts ISO 8601 or natural language."
+    ),
+    end: createFlexibleDateTimeSchema(
+      "Meeting end time. Accepts ISO 8601 or natural language."
+    ),
+    timeZone: z.string().optional().describe("Timezone for the meeting"),
+    attendees: z.array(z.object({
+      email: z.string().email().describe("Email address of the attendee")
+    })).optional().describe("List of meeting attendees"),
+    sendUpdates: z.enum(["all", "externalOnly", "none"]).optional().describe(
+      "Whether to send notifications about the meeting creation."
+    ),
+    allowDuplicates: z.boolean().optional().describe(
+      "If true, allows creation even when exact duplicates are detected. Default is false."
+    )
+  }),
+
+  'get-google-meet': z.object({
+    ...authParameterSchemas,
+    calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
+    eventId: z.string().describe("ID of the meeting (event) to retrieve"),
+    fields: z.array(z.enum(ALLOWED_EVENT_FIELDS)).optional().describe(
+      "Optional array of additional fields to retrieve."
+    )
+  }),
+
+  'update-google-meet': z.object({
+    ...authParameterSchemas,
+    calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
+    eventId: z.string().describe("ID of the meeting (event) to update"),
+    summary: z.string().optional().describe("Updated title of the meeting"),
+    description: z.string().optional().describe("Updated description/notes"),
+    start: createFlexibleDateTimeSchema("Updated start time").optional(),
+    end: createFlexibleDateTimeSchema("Updated end time").optional(),
+    timeZone: z.string().optional().describe("Updated timezone"),
+    attendees: z.array(z.object({
+      email: z.string().email().describe("Email address of the attendee")
+    })).optional().describe("Updated attendee list"),
+    sendUpdates: z.enum(["all", "externalOnly", "none"]).default("all").describe(
+      "Whether to send update notifications"
+    )
+  }),
+
+  'delete-google-meet': z.object({
+    ...authParameterSchemas,
+    calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
+    eventId: z.string().describe("ID of the meeting (event) to delete"),
+    sendUpdates: z.enum(["all", "externalOnly", "none"]).default("all").describe(
+      "Whether to send cancellation notifications"
+    )
   })
 } as const;
 
@@ -420,6 +480,12 @@ export type UpdateEventInput = ToolInputs['update-google-calendar-event'];
 export type DeleteEventInput = ToolInputs['delete-google-calendar-event'];
 export type GetFreeBusyInput = ToolInputs['get-google-calendar-freebusy'];
 export type GetCurrentTimeInput = ToolInputs['get-google-calendar-current-time'];
+
+// Google Meet Types
+export type CreateMeetInput = ToolInputs['create-google-meet'];
+export type GetMeetInput = ToolInputs['get-google-meet'];
+export type UpdateMeetInput = ToolInputs['update-google-meet'];
+export type DeleteMeetInput = ToolInputs['delete-google-meet'];
 
 interface ToolDefinition {
   name: keyof typeof ToolSchemas;
@@ -569,6 +635,45 @@ export class ToolRegistry {
       description: "Get current time in the primary Google Calendar's timezone (or a requested timezone).",
       schema: ToolSchemas['get-google-calendar-current-time'],
       handler: GetCurrentTimeHandler
+    },
+    // --- Google Meet Tools ---
+    {
+      name: "create-google-meet",
+      description: "Create a new Google Meet meeting (creates a calendar event with a conference link).",
+      schema: ToolSchemas['create-google-meet'],
+      handler: CreateEventHandler,
+      handlerFunction: async (args: CreateMeetInput) => {
+        // Inject conference data to generate a Google Meet link
+        return {
+          ...args,
+          conferenceData: {
+            createRequest: {
+              requestId: randomUUID(),
+              conferenceSolutionKey: {
+                type: "hangoutsMeet"
+              }
+            }
+          }
+        };
+      }
+    },
+    {
+      name: "get-google-meet",
+      description: "Get details of a Google Meet meeting (alias for get-google-calendar-event).",
+      schema: ToolSchemas['get-google-meet'],
+      handler: GetEventHandler
+    },
+    {
+      name: "update-google-meet",
+      description: "Update a Google Meet meeting (alias for update-google-calendar-event).",
+      schema: ToolSchemas['update-google-meet'],
+      handler: UpdateEventHandler
+    },
+    {
+      name: "delete-google-meet",
+      description: "Delete a Google Meet meeting (alias for delete-google-calendar-event).",
+      schema: ToolSchemas['delete-google-meet'],
+      handler: DeleteEventHandler
     }
   ];
 
@@ -592,7 +697,14 @@ export class ToolRegistry {
    */
   private static normalizeDateTimeFields(toolName: string, args: any): any {
     // Only normalize for tools that have datetime fields
-    const toolsWithDateTime = ['create-google-calendar-event', 'update-google-calendar-event', 'search-google-calendar-events', 'get-google-calendar-freebusy'];
+    const toolsWithDateTime = [
+      'create-google-calendar-event', 
+      'update-google-calendar-event', 
+      'search-google-calendar-events', 
+      'get-google-calendar-freebusy',
+      'create-google-meet',
+      'update-google-meet'
+    ];
     if (!toolsWithDateTime.includes(toolName)) {
       return args;
     }
