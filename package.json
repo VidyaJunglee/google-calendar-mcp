@@ -33,7 +33,7 @@
   "author": "nspady",
   "license": "MIT",
   "scripts": {
-    "start": "node build/index.js",
+    "start": "node build/index.js --transport http --port 5000",
     "build": "node scripts/build.js",
     "dev": "node scripts/dev.js",
     "lint": "tsc --noEmit -p tsconfig.lint.json",
