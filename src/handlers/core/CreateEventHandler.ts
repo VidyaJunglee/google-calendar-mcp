@@ -10,6 +10,9 @@ import { CONFLICT_DETECTION_CONFIG } from "../../services/conflict-detection/con
 import { createStructuredResponse, convertConflictsToStructured, createWarningsArray } from "../../utils/response-builder.js";
 import { CreateEventResponse, convertGoogleEventToStructured, DuplicateInfo } from "../../types/structured-responses.js";
 
+type EventSchema = calendar_v3.Schema$Event;
+type Attendee = calendar_v3.Schema$EventAttendee;
+
 export class CreateEventHandler extends BaseToolHandler {
     private conflictDetectionService: ConflictDetectionService;
     
@@ -19,11 +22,9 @@ export class CreateEventHandler extends BaseToolHandler {
     }
     
     async runTool(args: any, oauth2Client: OAuth2Client): Promise<CallToolResult> {
-        const validArgs = args as CreateEventInput;
-
-        // Create the event object for conflict checking
+        const validArgs = args as CreateEventInput;   
         const timezone = args.timeZone || await this.getCalendarTimezone(oauth2Client, validArgs.calendarId);
-        const eventToCheck: calendar_v3.Schema$Event = {
+        const eventToCheck: EventSchema = {
             summary: args.summary,
             description: args.description,
             start: createTimeObject(args.start, timezone),
@@ -51,7 +52,6 @@ export class CreateEventHandler extends BaseToolHandler {
         );
         
         if (exactDuplicate && validArgs.allowDuplicates !== true) {
-            // Create a duplicate error response
             const duplicateInfo: DuplicateInfo = {
                 event: {
                     id: exactDuplicate.event.id || '',
@@ -91,8 +91,9 @@ export class CreateEventHandler extends BaseToolHandler {
     private async createEvent(
         client: OAuth2Client,
         args: CreateEventInput
-    ): Promise<calendar_v3.Schema$Event> {
+    ): Promise<EventSchema> {
         try {
+            // getCalendar is inherited from BaseToolHandler
             const calendar = this.getCalendar(client);
             
             // Validate custom event ID if provided
@@ -102,13 +103,44 @@ export class CreateEventHandler extends BaseToolHandler {
             
             // Use provided timezone or calendar's default timezone
             const timezone = args.timeZone || await this.getCalendarTimezone(client, args.calendarId);
+
+            // --- 1. Ensure Primary User is an Attendee ---
+            // Fetch the primary user's email from the OAuth client credentials
+            const primaryEmail = (await client.getTokenInfo(client.credentials.access_token as string)).email; 
+            const primaryAttendee: Attendee = { email: primaryEmail, self: true };
             
-            const requestBody: calendar_v3.Schema$Event = {
+            // Initialize attendees list, ensuring the primary user is always present
+            const attendees: Attendee[] = args.attendees || [];
+            if (!attendees.some(a => a.email === primaryEmail)) {
+                attendees.push(primaryAttendee);
+            }
+            
+            // --- 2. Ensure Meet Link Creation (conferenceData) ---
+            const meetCreationRequest: calendar_v3.Schema$ConferenceData = {
+                createRequest: {
+                    requestId: args.eventId || Date.now().toString(),
+                    conferenceSolutionKey: { type: 'hangoutsMeet' }, // Request a Google Meet link
+                }
+            };
+            
+            // Determine conferenceData: Use user-provided data with a conferenceId (existing link),
+            // otherwise use the request to create a new Meet link.
+            let conferenceData: EventSchema['conferenceData'];
+
+            if (args.conferenceData && (args.conferenceData as any).conferenceId) {
+                // If user provided existing conference data, use it.
+                conferenceData = args.conferenceData;
+            } else {
+                // Default: Force creation of a new Meet link.
+                conferenceData = meetCreationRequest;
+            }
+
+            const requestBody: EventSchema = {
                 summary: args.summary,
                 description: args.description,
                 start: createTimeObject(args.start, timezone),
                 end: createTimeObject(args.end, timezone),
-                attendees: args.attendees,
+                attendees: attendees,
                 location: args.location,
                 colorId: args.colorId,
                 reminders: args.reminders,
@@ -119,22 +151,21 @@ export class CreateEventHandler extends BaseToolHandler {
                 guestsCanModify: args.guestsCanModify,
                 guestsCanSeeOtherGuests: args.guestsCanSeeOtherGuests,
                 anyoneCanAddSelf: args.anyoneCanAddSelf,
-                conferenceData: args.conferenceData,
+                conferenceData: conferenceData, // Use the robust conference data
                 extendedProperties: args.extendedProperties,
                 attachments: args.attachments,
                 source: args.source,
-                ...(args.eventId && { id: args.eventId }) // Include custom ID if provided
+                ...(args.eventId && { id: args.eventId })
             };
             
-            // Determine if we need to enable conference data or attachments
-            const conferenceDataVersion = args.conferenceData ? 1 : undefined;
             const supportsAttachments = args.attachments ? true : undefined;
             
+            // --- 3. CRITICAL: Set conferenceDataVersion to 1 in the options ---
             const response = await calendar.events.insert({
                 calendarId: args.calendarId,
                 requestBody: requestBody,
                 sendUpdates: args.sendUpdates,
-                ...(conferenceDataVersion && { conferenceDataVersion }),
+                conferenceDataVersion: 1, // MUST be 1 to process the createRequest
                 ...(supportsAttachments && { supportsAttachments })
             });
             

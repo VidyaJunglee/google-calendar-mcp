@@ -403,65 +403,6 @@ export const ToolSchemas = {
       "Optional IANA timezone (e.g., 'America/Los_Angeles', 'Europe/London', 'UTC'). If not provided, uses the primary Google Calendar's default timezone."
     )
   }),
-
-  // --- Google Meet Tools ---
-  'create-google-meet': z.object({
-    ...authParameterSchemas,
-    calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
-    summary: z.string().describe("Title of the meeting"),
-    description: z.string().optional().describe("Description/notes for the meeting"),
-    start: createFlexibleDateTimeSchema(
-      "Meeting start time. Accepts ISO 8601 or natural language."
-    ),
-    end: createFlexibleDateTimeSchema(
-      "Meeting end time. Accepts ISO 8601 or natural language."
-    ),
-    timeZone: z.string().optional().describe("Timezone for the meeting"),
-    attendees: z.array(z.object({
-      email: z.string().email().describe("Email address of the attendee")
-    })).optional().describe("List of meeting attendees"),
-    sendUpdates: z.enum(["all", "externalOnly", "none"]).optional().describe(
-      "Whether to send notifications about the meeting creation."
-    ),
-    allowDuplicates: z.boolean().optional().describe(
-      "If true, allows creation even when exact duplicates are detected. Default is false."
-    )
-  }),
-
-  'get-google-meet': z.object({
-    ...authParameterSchemas,
-    calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
-    eventId: z.string().describe("ID of the meeting (event) to retrieve"),
-    fields: z.array(z.enum(ALLOWED_EVENT_FIELDS)).optional().describe(
-      "Optional array of additional fields to retrieve."
-    )
-  }),
-
-  'update-google-meet': z.object({
-    ...authParameterSchemas,
-    calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
-    eventId: z.string().describe("ID of the meeting (event) to update"),
-    summary: z.string().optional().describe("Updated title of the meeting"),
-    description: z.string().optional().describe("Updated description/notes"),
-    start: createFlexibleDateTimeSchema("Updated start time").optional(),
-    end: createFlexibleDateTimeSchema("Updated end time").optional(),
-    timeZone: z.string().optional().describe("Updated timezone"),
-    attendees: z.array(z.object({
-      email: z.string().email().describe("Email address of the attendee")
-    })).optional().describe("Updated attendee list"),
-    sendUpdates: z.enum(["all", "externalOnly", "none"]).default("all").describe(
-      "Whether to send update notifications"
-    )
-  }),
-
-  'delete-google-meet': z.object({
-    ...authParameterSchemas,
-    calendarId: z.string().describe("ID of the calendar (use 'primary' for the main calendar)"),
-    eventId: z.string().describe("ID of the meeting (event) to delete"),
-    sendUpdates: z.enum(["all", "externalOnly", "none"]).default("all").describe(
-      "Whether to send cancellation notifications"
-    )
-  })
 } as const;
 
 // Generate TypeScript types from schemas
