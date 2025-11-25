@@ -422,12 +422,6 @@ export type DeleteEventInput = ToolInputs['delete-google-calendar-event'];
 export type GetFreeBusyInput = ToolInputs['get-google-calendar-freebusy'];
 export type GetCurrentTimeInput = ToolInputs['get-google-calendar-current-time'];
 
-// Google Meet Types
-export type CreateMeetInput = ToolInputs['create-google-meet'];
-export type GetMeetInput = ToolInputs['get-google-meet'];
-export type UpdateMeetInput = ToolInputs['update-google-meet'];
-export type DeleteMeetInput = ToolInputs['delete-google-meet'];
-
 interface ToolDefinition {
   name: keyof typeof ToolSchemas;
   description: string;
@@ -577,45 +571,6 @@ export class ToolRegistry {
       schema: ToolSchemas['get-google-calendar-current-time'],
       handler: GetCurrentTimeHandler
     },
-    // --- Google Meet Tools ---
-    {
-      name: "create-google-meet",
-      description: "Create a new Google Meet meeting (creates a calendar event with a conference link).",
-      schema: ToolSchemas['create-google-meet'],
-      handler: CreateEventHandler,
-      handlerFunction: async (args: CreateMeetInput) => {
-        // Inject conference data to generate a Google Meet link
-        return {
-          ...args,
-          conferenceData: {
-            createRequest: {
-              requestId: randomUUID(),
-              conferenceSolutionKey: {
-                type: "hangoutsMeet"
-              }
-            }
-          }
-        };
-      }
-    },
-    {
-      name: "get-google-meet",
-      description: "Get details of a Google Meet meeting (alias for get-google-calendar-event).",
-      schema: ToolSchemas['get-google-meet'],
-      handler: GetEventHandler
-    },
-    {
-      name: "update-google-meet",
-      description: "Update a Google Meet meeting (alias for update-google-calendar-event).",
-      schema: ToolSchemas['update-google-meet'],
-      handler: UpdateEventHandler
-    },
-    {
-      name: "delete-google-meet",
-      description: "Delete a Google Meet meeting (alias for delete-google-calendar-event).",
-      schema: ToolSchemas['delete-google-meet'],
-      handler: DeleteEventHandler
-    }
   ];
 
   static getToolsWithSchemas() {
